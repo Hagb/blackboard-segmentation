@@ -8,13 +8,6 @@ def get_mask(img):
         cv2.medianBlur(img, min(img.shape[:2])//2048*2+1),
         cv2.COLOR_BGR2HSV
     )
-    # tmp_area = hsv[np.where(cv2.inRange(
-    #     hsv,
-    #     (180*1.5/5, hsv[:, :, 1].mean() * 0.4, hsv[:, :, 2].mean()*0.25),
-    #     (180*3/5, 256*4/5, 256*4/5)
-    # ))]
-    # s_mean = hsv[:, :, 1].mean()
-    # v_mean = hsv[:, :, 2].mean()
     return cv2.inRange(
         hsv,
         (180*1.5/5, 256//4, 256//20),
@@ -142,11 +135,12 @@ def get_lines_step3(lines, info: LinesInfo):
                 for l in range(i+1, len(lines)):
                     if l == k or l == j:
                         continue
+                    if (points[k][l] if k > l else points[l][k]) is None or \
+                            (points[l][j] if l > j else points[j][l]) is None:
+                        continue
                     nodes = np.array((points[j][i], points[k][i],
                                       points[k][l] if k > l else points[l][k],
                                       points[l][j] if l > j else points[j][l]))
-                    if nodes[-1] is None or nodes[-2] is None:
-                        continue
                     if not is_convex(nodes):
                         continue
                     max_x_estimated = max(max(nodes[:, 0, 0]), max_x)
@@ -183,7 +177,7 @@ def get_lines_step3(lines, info: LinesInfo):
                     )
                     if (not_coverd_area < area//10):
                         board_lines.append((nodes, not_coverd_area, diff_area))
-    if len(board_lines)==0:
+    if len(board_lines) == 0:
         raise ValueError("Cannot find a convex quadrangle")
     return min(board_lines, key=lambda x: x[2]+x[1])
 
@@ -210,27 +204,35 @@ def adjust(img, points: np.array):
     return dst
 
 
-def segment_strokes_step1(dst):
+def segment_strokes(dst):
     def circ_kernel(r): return (
         np.add(*map(lambda x: x**2, np.ogrid[-r:r+1, -r:r+1])) <= r**2).astype(np.uint8)
-    backcolor = cv2.erode(cv2.dilate(dst, circ_kernel(4)), circ_kernel(8))
-    forecolor = cv2.erode(dst, np.ones((2, 2), np.uint8))
-    return (forecolor > backcolor + np.uint8(5)).all(axis=2).astype(np.uint8) * np.uint8(255), backcolor
+    dst_new = cv2.erode(dst, circ_kernel(1))
+    backcolor = cv2.erode(cv2.dilate(dst_new, circ_kernel(5)), circ_kernel(8))
+    forecolor = dst_new
+    return (forecolor > backcolor + np.uint8(5)).all(axis=2).astype(np.uint8) * np.uint8(255)
 
 
-def segment_strokes_step2(dst, mask,  backcolor):
+def strokes_writebalance(dst, mask):
     dst_stroke = dst.copy()  # - backcolor
     dst_stroke[np.where(mask == 0)] = (0, 0, 0)
-    white_balancer = cv2.xphoto.createSimpleWB()
-    white_balancer.setP(0.5 * np.count_nonzero(mask) / (mask.shape[0] * mask.shape[1]))
-    return white_balancer.balanceWhite(dst_stroke)
- 
-def segment_strokes_step3(dst_stroke):
-    pass
+    mean = dst_stroke[100:-100, 200:-
+                      200][np.where(mask[100:-100, 200:-200] != 0)].mean(axis=0)
+    k = max(mean.mean(), 128+64) / mean
+    overflew_mask = (dst_stroke > 255 // k).any(axis=2)
+    print(mean)
+    overflew_axis = np.where(overflew_mask)
+    not_over_axis = np.where(np.logical_not(overflew_mask))
+    dst_stroke[not_over_axis] = \
+        (dst_stroke[not_over_axis] * k).astype(np.uint8)
+    k_array = (255 / np.array((dst_stroke[overflew_axis].max(axis=1),)*3)).T
+    dst_stroke[overflew_axis] = (
+        dst_stroke[overflew_axis] * k_array).astype(np.uint8)
+    return dst_stroke
 
 
 def draw_line(img, line, info: LinesInfo):
-    rho, theta = line[0,-2:]  # 获取极值ρ长度和θ角度
+    rho, theta = line[0, -2:]  # 获取极值ρ长度和θ角度
     a = np.cos(theta)  # 获取角度cos值
     b = np.sin(theta)  # 获取角度sin值
     x0 = info.min_x + a * rho  # 获取x轴值
