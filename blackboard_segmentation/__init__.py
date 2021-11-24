@@ -71,7 +71,7 @@ def get_lines_step2(lines, info: LinesInfo):
     lines_choice = [True]*len(lines)
     old_index = 0
     for i in range(1, len(lines)):
-        if lines[i, 0, 2]-lines[i-1, 0, 2] <= np.pi//18//2 and np.abs(lines[i, 0, 1]-lines[i-1, 0, 1]) < info.max_length//64:
+        if lines[i, 0, 2]-lines[i-1, 0, 2] <= np.pi/18/2 and np.abs(lines[i, 0, 1]-lines[i-1, 0, 1]) < info.max_length//64:
             if lines[i, 0, 0] > lines[old_index, 0, 0]:
                 lines_choice[old_index] = False
                 old_index = i
@@ -231,7 +231,7 @@ def strokes_writebalance(dst, mask):
     return dst_stroke
 
 
-def draw_line(img, line, info: LinesInfo):
+def draw_line(img, line, info: LinesInfo, color=(255,255,255)):
     rho, theta = line[0, -2:]  # 获取极值ρ长度和θ角度
     a = np.cos(theta)  # 获取角度cos值
     b = np.sin(theta)  # 获取角度sin值
@@ -242,7 +242,7 @@ def draw_line(img, line, info: LinesInfo):
     y1 = int(y0 - max_length * (a))  # 获取这条直线最大值点y1
     x2 = int(x0 + max_length * (-b))  # 获取这条直线最小值点x2　　
     y2 = int(y0 + max_length * (a))  # 获取这条直线最小值点y2　　其中*1000是内部规则
-    cv2.line(img, (x1, y1), (x2, y2), (255, 0, 0),
+    cv2.line(img, (x1, y1), (x2, y2), color,
              max(img.shape[:2])//512)  # 开始划线
 
 
