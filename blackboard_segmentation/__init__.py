@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 import cv2
 import numpy as np
+import sys
 
 
 def get_mask(img):
@@ -179,7 +180,7 @@ def get_lines_step3(lines, info: LinesInfo):
                         board_lines.append((nodes, not_coverd_area, diff_area))
     if len(board_lines) == 0:
         raise ValueError("Cannot find a convex quadrangle")
-    return min(board_lines, key=lambda x: x[2]+x[1])
+    return min(board_lines, key=lambda x: x[2]+x[1])[0]
 
 
 def adjust(img, points: np.array):
@@ -220,7 +221,6 @@ def strokes_writebalance(dst, mask):
                       200][np.where(mask[100:-100, 200:-200] != 0)].mean(axis=0)
     k = max(mean.mean(), 128+64) / mean
     overflew_mask = (dst_stroke > 255 // k).any(axis=2)
-    print(mean)
     overflew_axis = np.where(overflew_mask)
     not_over_axis = np.where(np.logical_not(overflew_mask))
     dst_stroke[not_over_axis] = \
@@ -244,3 +244,22 @@ def draw_line(img, line, info: LinesInfo):
     y2 = int(y0 + max_length * (a))  # 获取这条直线最小值点y2　　其中*1000是内部规则
     cv2.line(img, (x1, y1), (x2, y2), (255, 0, 0),
              max(img.shape[:2])//512)  # 开始划线
+
+
+def main():
+    input_filename = sys.argv[1]
+    img = cv2.imread(input_filename, cv2.IMREAD_COLOR)
+    mask_blackboard = get_mask(img)
+    area, c = get_edge_contour(mask_blackboard)
+    points = get_lines_step3(
+        *get_lines_step2(*get_lines_step1(area, c, mask_blackboard)))
+    dst_adjusted = adjust(img, points)
+    cv2.imwrite("adjusted.jpg", dst_adjusted)
+    dst_bw = segment_strokes(dst_adjusted)
+    cv2.imwrite("bw.jpg", dst_bw)
+    dst = strokes_writebalance(dst_adjusted, dst_bw)
+    cv2.imwrite("dst.jpg", dst)
+
+
+if __name__ == "__main__":
+    main()
