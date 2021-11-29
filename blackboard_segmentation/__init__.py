@@ -225,7 +225,8 @@ def strokes_whitebalance(dst, mask):
     not_over_axis = np.where(np.logical_not(overflew_mask))
     dst_stroke[not_over_axis] = \
         (dst_stroke[not_over_axis] * k).astype(np.uint8)
-    k_array = (255 / np.array((dst_stroke[overflew_axis].max(axis=1),)*3)).T
+    k_max = (dst_stroke[overflew_axis] / mean.astype(np.float)).max(axis=1)
+    k_array = np.float(255) / (mean * np.array((k_max, k_max, k_max), np.float).T)
     dst_stroke[overflew_axis] = (
         dst_stroke[overflew_axis] * k_array).astype(np.uint8)
     return dst_stroke
