@@ -214,7 +214,7 @@ def segment_strokes(dst):
     return (forecolor > backcolor + np.uint8(5)).all(axis=2).astype(np.uint8) * np.uint8(255)
 
 
-def strokes_writebalance(dst, mask):
+def strokes_whitebalance(dst, mask):
     dst_stroke = dst.copy()  # - backcolor
     dst_stroke[np.where(mask == 0)] = (0, 0, 0)
     mean = dst_stroke[100:-100, 200:-
@@ -257,7 +257,7 @@ def main():
     cv2.imwrite("adjusted.jpg", dst_adjusted)
     dst_bw = segment_strokes(dst_adjusted)
     cv2.imwrite("bw.jpg", dst_bw)
-    dst = strokes_writebalance(dst_adjusted, dst_bw)
+    dst = strokes_whitebalance(dst_adjusted, dst_bw)
     cv2.imwrite("dst.jpg", dst)
 
 
